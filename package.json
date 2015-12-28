@@ -1,36 +1,28 @@
 {
-  "name": "enb-babel",
-  "version": "0.4.0-rc.0",
+  "name": "enb-babel-zen",
+  "version": "0.5",
   "description": "enb babel tech",
   "keywords": [
     "enb",
     "babel"
   ],
-  "author": "Stanislav Panferov <fnight.m@gmail.com>",
+  "author": "Kalentine Vamenek <aisseday@gmail.com>",
   "licenses": [
     {
       "type": "MIT",
-      "url": "https://github.com/s-panferov/enb-babel/blob/master/LICENSE"
+      "url": "https://github.com/hamosapience/enb-babel/blob/master/LICENSE"
     }
   ],
   "repository": {
     "type": "git",
-    "url": "git@github.com:s-panferov/enb-babel.git"
+    "url": "git@github.com:hamosapience/enb-babel.git"
   },
-  "homepage": "https://github.com/s-panferov/enb-babel",
-  "bugs": "https://github.com/s-panferov/enb-babel/issues",
-  "maintainers": [
-    {
-      "name": "Stanislav Panferov",
-      "email": "fnight.m@gmail.com",
-      "github-username": "s-panferov"
-    }
-  ],
+  "homepage": "https://github.com/hamosapience/enb-babel",
   "peerDependencies": {
     "enb": ">=0.8.43 <2.0.0"
   },
   "dependencies": {
-    "babel": "^5.8.23",
+    "babel-core": "^6.3.26",
     "concat-with-sourcemaps": "^1.0.2",
     "lodash": "^3.7.0",
     "source-map": "^0.4.2",
