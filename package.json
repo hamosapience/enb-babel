@@ -1,6 +1,6 @@
 {
   "name": "enb-babel-zen",
-  "version": "0.5",
+  "version": "0.6.0",
   "description": "enb babel tech",
   "keywords": [
     "enb",
@@ -23,13 +23,10 @@
   },
   "dependencies": {
     "babel-core": "^6.3.26",
-    "concat-with-sourcemaps": "^1.0.2",
     "lodash": "^3.7.0",
-    "source-map": "^0.4.2",
-    "unique-concat": "^0.2.2",
+    "uglify-js": "^2.6.1",
     "vow": "^0.4.9",
-    "vow-fs": "^0.3.4",
-    "ym": "^0.1.1"
+    "vow-fs": "^0.3.4"
   },
   "devDependencies": {
     "grunt": "^0.4.5",

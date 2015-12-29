@@ -1,101 +1,66 @@
-var path = require('path'),
-    babel = require('babel'),
-    _ = require('lodash'),
-    Concat = require('concat-with-sourcemaps'),
-    uniqConcat = require('unique-concat'),
-    fs = require('fs'),
-    vow = require('vow'),
-    fsCache = require('../lib/fs-cache'),
-    sourcemap = require('../lib/sourcemap');
+var path = require('path');
+var babel = require('babel-core');
+var _ = require('lodash');
+var fs = require('fs');
+var uglifyJS = require("uglify-js").minify;
+
+var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
+
+function minify(code, map, mapFileName) {
+
+    var result = uglifyJS(code, {
+        fromString: true,
+        outSourceMap: mapFileName,
+        inSourceMap: map
+    });
+
+    return result;
+}
 
 module.exports = require('enb/lib/build-flow').create()
-    .name('js-babel')
-    .target('target', '?.browser.js')
+    .name('node-babel')
+    .target('destTarget', '?.js')
     .defineOption('babelOptions')
-    .useFileList(['vanilla.js', 'js', 'browser.js', 'jsx'])
-    .builder(function (files) {
+    .defineRequiredOption('sourceTarget')
+    .defineOption('destTarget')
+    .defineOption('minify')
+    .useSourceText('sourceTarget')
+    .saveCache(function(cache) {
+        cache.cacheFileInfo('', this._modulesFile);
+    })
+    .builder(function (js) {
 
-        var babelOptions = _.merge(this._options.babelOptions || {}, {
-            externalHelpers: 'var',
+        var DEFAULT_BABEL_OPTS = {
             ast: false,
-        });
+            compact: true,
+            comments: false,
+            sourceMaps: true,
+            sourceMapTarget: this._sourceTarget,
+            sourceFileName: this._sourceTarget,
+            plugins: ["transform-es2015-arrow-functions"]
+        };
 
-        var concat = new Concat(true, 'all.js', '\n');
-        var target = this.node.resolvePath(this._target);
+        var babelOptions = _.merge(this._options.babelOptions || {}, DEFAULT_BABEL_OPTS);
 
-        return vow.all(files.map(function (arg) {
-            var def = vow.defer();
+        var dirPath = this.node.getDir();
+        var mapFileName = (this._target + '.map');
+        var mapFilePath = path.join(dirPath, mapFileName);
 
-            var finalOptions = _.merge(
-                {
-                    filename: arg.fullname,
-                    filenameRelative : "/" + path.relative(process.cwd(), arg.fullname)
-                },
-                babelOptions
-            );
+        var transformResult = babel.transform(js, babelOptions);
+        var result;
 
-            fsCache({
-                    directory: '.enb/babel',
-                    identifier: arg.fullname,
-                    source: fs.readFileSync(arg.fullname),
-                    options: finalOptions,
-                    transform: function(source, options) {
-                        return babel.transform(
-                            source,
-                            finalOptions
-                        );
-                    },
-                },
-                function (err, result) {
-                    if (err) {
-                        def.reject(err);
-                    } else {
-                        def.resolve({file : arg, result : result});
-                    }
-                }
-            )
+        if (this._options.minify) {
+            result = minify(transformResult.code, transformResult.map, mapFileName);
+        } else {
+            // Если не надо сжимать, руками вклеиваем ссылку на source map
+            result = transformResult;
+            result.code = result.code + sourceMappingURLTemplate.replace('%filename', mapFileName);
+            result.map = JSON.stringify(result.map);
+        }
 
-            return def.promise();
+        fs.writeFileSync(mapFilePath, result.map);
 
-        })).then(function (res) {
+        return (result.code);
 
-            var usedHelpers = [],
-                concatArgs = [];
-
-            res.forEach(function(transform) {
-
-                var node,
-                    result = transform.result;
-                    file = transform.file;
-
-                if (result.metadata.usedHelpers) {
-                    usedHelpers = uniqConcat(usedHelpers, result.metadata.usedHelpers);
-                }
-
-                if (result.map) {
-                    concatArgs.push([file.fullname, result.code, result.map]);
-                } else {
-                    node = sourcemap.generate(file.fullname, result.code);
-                    concatArgs.push([
-                        sourcemap.normalizeFileName(file.fullname),
-                        result.code,
-                        JSON.parse(node.map.toString())
-                    ]);
-                }
-            });
-
-            var babelHelpers = babel.buildExternalHelpers(usedHelpers);
-            var babelHelpersSourceMap = sourcemap.generate('babelHelpers.js', babelHelpers);
-            var babelHelpersSourceMapEncoded = JSON.parse(babelHelpersSourceMap.map.toString());
-
-            concat.add('babelHelpers.js', babelHelpers, babelHelpersSourceMapEncoded);
-
-            concatArgs.forEach(function(arg) {
-                concat.add.apply(concat, arg);
-            });
-
-            fs.writeFileSync(target + '.map', concat.sourceMap);
-            return concat.content;
-        });
     })
     .createTech();
