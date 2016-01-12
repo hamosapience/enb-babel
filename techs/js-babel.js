@@ -4,6 +4,7 @@ var _ = require('lodash');
 var fs = require('fs');
 var uglifyJS = require("uglify-js-harmony").minify;
 var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
+var crypto = require('crypto');
 
 function minify(code, map, mapFileName) {
 
@@ -16,6 +17,10 @@ function minify(code, map, mapFileName) {
     return result;
 }
 
+function getHash(content) {
+    return crypto.createHash('md5').update(content).digest('hex');
+}
+
 module.exports = require('enb/lib/build-flow').create()
     .name('js-babel')
     .target('destTarget', '?.js')
@@ -25,21 +30,8 @@ module.exports = require('enb/lib/build-flow').create()
     .defineOption('minify')
     .defineOption('plugins')
     .useSourceText('sourceTarget')
-    .needRebuild(function(cache) {
-
-        var source = this._sourceTarget;
-        var sourcePath = this.node.resolvePath(source);
-
-        console.log('needRebuild', sourcePath, cache.needRebuildFile('source-file', sourcePath));
-
-        return cache.needRebuildFile('source-file', sourcePath);
-    })
-    .saveCache(function(cache) {
-
-        var source = this._sourceTarget;
-        var sourcePath = this.node.resolvePath(source);
-
-        cache.cacheFileInfo('source-file', sourcePath);
+    .needRebuild(function() {
+        return true;
     })
     .builder(function (js) {
 
@@ -52,15 +44,27 @@ module.exports = require('enb/lib/build-flow').create()
             sourceFileName: this._sourceTarget,
             plugins: this._options.plugins || []
         };
-
         var babelOptions = _.merge(this._options.babelOptions || {}, DEFAULT_BABEL_OPTS);
 
         var dirPath = this.node.getDir();
+
+        var sourceCache = this.node.getNodeCache(this._sourceTarget);
+        var targetCache = this.node.getNodeCache(this._target);
+
+        var targetCacheData = (targetCache.get('data') && JSON.parse(targetCache.get('data'))) || {};
+
+        var sourceHash = getHash(js);
+        var cachedSourceHash = sourceCache.get('hash');
+
+        if (sourceHash === cachedSourceHash && targetCacheData.hash === sourceHash) {
+            return targetCacheData.src;
+        }
 
         var mapFileName = (this._target + '.map');
         var mapFilePath = path.join(dirPath, mapFileName);
 
         var transformResult = babel.transform(js, babelOptions);
+
         var result;
 
         if (this._options.minify) {
@@ -73,6 +77,12 @@ module.exports = require('enb/lib/build-flow').create()
         }
 
         fs.writeFileSync(mapFilePath, result.map);
+
+        sourceCache.set('hash', sourceHash);
+        targetCache.set('data', JSON.stringify({
+            src: result.code,
+            hash: sourceHash
+        }));
 
         return (result.code);
 
