@@ -2,7 +2,7 @@ var path = require('path');
 var babel = require('babel-core');
 var _ = require('lodash');
 var fs = require('fs');
-var uglifyJS = require("uglify-js").minify;
+var uglifyJS = require("uglify-js-harmony").minify;
 
 var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
 

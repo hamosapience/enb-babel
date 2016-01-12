@@ -1,6 +1,6 @@
 {
   "name": "enb-babel-zen",
-  "version": "0.6.3",
+  "version": "0.6.5",
   "description": "enb babel tech",
   "keywords": [
     "enb",
@@ -43,6 +43,7 @@
     "babel-plugin-transform-flow-strip-types": "^6.3.15",
     "babel-plugin-transform-strict-mode": "^6.3.13",
     "lodash": "^3.7.0",
+    "touch": "^1.0.0",
     "uglify-js-harmony": "^2.6.1",
     "vow": "^0.4.9",
     "vow-fs": "^0.3.4"
