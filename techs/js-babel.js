@@ -3,7 +3,6 @@ var babel = require('babel-core');
 var _ = require('lodash');
 var fs = require('fs');
 var uglifyJS = require("uglify-js-harmony").minify;
-
 var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
 
 function minify(code, map, mapFileName) {
@@ -18,15 +17,29 @@ function minify(code, map, mapFileName) {
 }
 
 module.exports = require('enb/lib/build-flow').create()
-    .name('node-babel')
+    .name('js-babel')
     .target('destTarget', '?.js')
     .defineOption('babelOptions')
     .defineRequiredOption('sourceTarget')
     .defineOption('destTarget')
     .defineOption('minify')
+    .defineOption('plugins')
     .useSourceText('sourceTarget')
+    .needRebuild(function(cache) {
+
+        var source = this._sourceTarget;
+        var sourcePath = this.node.resolvePath(source);
+
+        console.log('needRebuild', sourcePath, cache.needRebuildFile('source-file', sourcePath));
+
+        return cache.needRebuildFile('source-file', sourcePath);
+    })
     .saveCache(function(cache) {
-        cache.cacheFileInfo('', this._modulesFile);
+
+        var source = this._sourceTarget;
+        var sourcePath = this.node.resolvePath(source);
+
+        cache.cacheFileInfo('source-file', sourcePath);
     })
     .builder(function (js) {
 
@@ -37,12 +50,13 @@ module.exports = require('enb/lib/build-flow').create()
             sourceMaps: true,
             sourceMapTarget: this._sourceTarget,
             sourceFileName: this._sourceTarget,
-            plugins: ["transform-es2015-arrow-functions"]
+            plugins: this._options.plugins || []
         };
 
         var babelOptions = _.merge(this._options.babelOptions || {}, DEFAULT_BABEL_OPTS);
 
         var dirPath = this.node.getDir();
+
         var mapFileName = (this._target + '.map');
         var mapFilePath = path.join(dirPath, mapFileName);
 
@@ -61,6 +75,7 @@ module.exports = require('enb/lib/build-flow').create()
         fs.writeFileSync(mapFilePath, result.map);
 
         return (result.code);
+
 
     })
     .createTech();
