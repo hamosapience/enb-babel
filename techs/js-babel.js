@@ -1,15 +1,14 @@
 var path = require('path');
 var babel = require('babel-core');
 var _ = require('lodash');
-var fs = require('fs');
 var uglifyJS = require("uglify-js-harmony").minify;
-var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
-var crypto = require('crypto');
 var Vow = require('vow');
 var vowFs = require('vow-fs');
-
 var convert = require('convert-source-map');
 var combine = require('combine-source-map');
+
+var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
+var includeRe = /include\("(.+)"\)/;
 
 function minify(code, map, mapFileName) {
 
@@ -22,13 +21,45 @@ function minify(code, map, mapFileName) {
     return result;
 }
 
-function getHash(content) {
-    return crypto.createHash('md5').update(content).digest('hex');
+function getCacheMtimeKey(filename/*: string */)/*: string */ {
+    return (filename + '-mtime');
 }
 
-// include("../../blocks/v2/i-bem/i-bem.js");
+function getCacheResultKey(filename/*: string */)/*: string */ {
+    return (filename + '-result');
+}
 
-var includeRe = /include\("(.+)"\)/;
+function createBundleSourceMap(transformedContent/*: Array<BabelTransformResult> */, mapFileName/*: string */, targetFileName/*: string */)/*: Object<SourceMap> */ {
+
+    var bundleSourceMap = combine.create(mapFileName);
+    var lines = 0;
+
+    transformedContent.forEach(function(content) {
+
+        var stringifiedMap = convert.fromObject(content.map).toComment();
+        var source = content.map.sourcesContent[0];
+        var lineCount = content.code.split(/\r\n|\r|\n/).length;
+
+        bundleSourceMap.addFile({
+            source: (source + '\n' + stringifiedMap),
+            sourceFile: content.map.file
+        }, {
+            line: lines
+        });
+
+        lines += lineCount;
+
+    });
+
+    var bundleSourceMapBase64 = bundleSourceMap.base64();
+    var bundleSourceMapObject = convert.fromBase64(bundleSourceMapBase64).toObject();
+
+    // bundleSourceMapObject.sources = [target];
+    bundleSourceMapObject.file = targetFileName;
+
+    return bundleSourceMapObject;
+
+}
 
 module.exports = require('enb/lib/build-flow').create()
     .name('js-babel')
@@ -45,11 +76,12 @@ module.exports = require('enb/lib/build-flow').create()
     .builder(function (includeList) {
 
         var node = this.node;
-        var cache = this.node.getNodeCache(this._target);
+        var cache = this.node.getNodeCache(this._sourceTarget);
         var dirPath = this.node.getDir();
         var mapFileName = (this._target + '.map');
         var mapFilePath = path.join(dirPath, mapFileName);
         var target = this._target;
+        var shouldMinify = this._options.minify;
 
         var defaultBabelOptions = _.merge(this._options.babelOptions || {}, {
             ast: false,
@@ -72,135 +104,60 @@ module.exports = require('enb/lib/build-flow').create()
 
         var transformResults = Vow.all(filenames.map(function(filename) {
 
-            // TODO: где-то здесь кэширование
+            var filePath = node.resolvePath(filename);
 
-            return vowFs.read(node.resolvePath(filename), 'utf8').then(function(fileContent) {
+            var cacheMtimeKey = getCacheMtimeKey(filename);
+            var cacheResultKey = getCacheResultKey(filename);
 
-                var babelOptions = _.merge(defaultBabelOptions, {
-                    sourceMapTarget: filename,
-                    sourceFileName: filename
+            var cachedValue = cache.get(cacheResultKey);
+
+            if (cache.needRebuildFile(cacheMtimeKey, filePath) || !cachedValue) {
+                return vowFs.read(filePath, 'utf8').then(function(fileContent) {
+
+                    var babelOptions = _.merge(defaultBabelOptions, {
+                        sourceMapTarget: filename,
+                        sourceFileName: filename
+                    });
+
+                    var transformResult = babel.transform(fileContent, babelOptions);
+
+                    cache.set(cacheResultKey, JSON.stringify(transformResult));
+                    cache.cacheFileInfo(cacheMtimeKey, filePath);
+
+                    return transformResult;
                 });
-
-                return babel.transform(fileContent, babelOptions);
-            });
+            } else {
+                return Vow.when(JSON.parse(cachedValue));
+            }
 
         }));
 
         var result = transformResults.then(function(transformedContent) {
 
-            var bundleSourceMap = combine.create(mapFileName);
-
-            // var sourceMap = convert.fromObject(transformedContent.map).toComment();
-            //
-
-            var lines = 0;
-
-            transformedContent.forEach(function(content) {
-
-                var stringifiedMap = convert.fromObject(content.map).toComment();
-                var source = content.map.sourcesContent[0];
-                var lineCount = content.code.split(/\r\n|\r|\n/).length;
-
-                bundleSourceMap.addFile({
-                    source: (source + '\n' + stringifiedMap),
-                    sourceFile: content.map.file
-                }, {
-                    line: lines
-                });
-
-                lines += lineCount;
-
-            });
-
-            var bundleSourceMapBase64 = bundleSourceMap.base64();
-            var bundleSourceMapObject = convert.fromBase64(bundleSourceMapBase64).toObject();
-
-            // bundleSourceMapObject.sources = [target];
-            bundleSourceMapObject.file = target;
-
-
-            fs.writeFileSync(mapFilePath, JSON.stringify(bundleSourceMapObject));
-
-
-            // var sourceMaps = transformedContent.map(function(content) {
-            //     return content.map;
-            // });
-
-            var code = transformedContent
+            var bundleSourceMap = createBundleSourceMap(transformedContent, mapFileName, target);
+            var bundleCode = transformedContent
                 .map(function(content) {
                     return content.code;
                 })
                 .join('\n');
+            var result;
 
-            code += sourceMappingURLTemplate.replace('%filename', mapFileName);
+            if (shouldMinify) {
+                result = minify(bundleCode, bundleSourceMap, mapFileName);
+            } else {
+                // Если не надо сжимать, руками вклеиваем ссылку на source map
+                result = {};
+                result.code = bundleCode + sourceMappingURLTemplate.replace('%filename', mapFileName);
+                result.map = JSON.stringify(bundleSourceMap);
+            }
 
-            return code;
+            return vowFs.write(mapFilePath, result.map).then(function() {
+                return result.code;
+            });
 
         });
 
-
         return result;
-
-
-        // Vow.all(filenames.map(function(filename) {
-        //     return vowFs.read(filename);
-        // }))
-        // .then(function(fileContents) {
-        //     console.log(fileContents);
-        // })
-
-
-
-
-
-
-        // console.log(filenames);
-
-
-
-
-
-
-
-
-
-        var sourceCache = this.node.getNodeCache(this._sourceTarget);
-        var targetCache = this.node.getNodeCache(this._target);
-
-        var targetCacheData = (targetCache.get('data') && JSON.parse(targetCache.get('data'))) || {};
-
-        var sourceHash = getHash(js);
-        var cachedSourceHash = sourceCache.get('hash');
-
-        console.log('targetCacheData', targetCacheData && targetCacheData.hash, 'sourceHash', sourceHash);
-
-        if (sourceHash === cachedSourceHash && targetCacheData.hash === sourceHash) {
-            return targetCacheData.src;
-        }
-
-        var transformResult = babel.transform(js, babelOptions);
-
-        var result;
-
-        if (this._options.minify) {
-            result = minify(transformResult.code, transformResult.map, mapFileName);
-        } else {
-            // Если не надо сжимать, руками вклеиваем ссылку на source map
-            result = transformResult;
-            result.code = result.code + sourceMappingURLTemplate.replace('%filename', mapFileName);
-            result.map = JSON.stringify(result.map);
-        }
-
-        fs.writeFileSync(mapFilePath, result.map);
-
-        sourceCache.set('hash', sourceHash);
-        targetCache.set('data', JSON.stringify({
-            src: result.code,
-            hash: sourceHash
-        }));
-
-        return (result.code);
-
 
     })
     .createTech();
