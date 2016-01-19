@@ -1,6 +1,6 @@
 var path = require('path');
 var babel = require('babel-core');
-var _ = require('lodash');
+var merge = require('lodash.merge');
 var uglifyJS = require("uglify-js-harmony").minify;
 var Vow = require('vow');
 var vowFs = require('vow-fs');
@@ -83,7 +83,7 @@ module.exports = require('enb/lib/build-flow').create()
         var target = this._target;
         var shouldMinify = this._options.minify;
 
-        var defaultBabelOptions = _.merge(this._options.babelOptions || {}, {
+        var defaultBabelOptions = merge(this._options.babelOptions || {}, {
             ast: false,
             compact: true,
             comments: false,
@@ -114,7 +114,7 @@ module.exports = require('enb/lib/build-flow').create()
             if (cache.needRebuildFile(cacheMtimeKey, filePath) || !cachedValue) {
                 return vowFs.read(filePath, 'utf8').then(function(fileContent) {
 
-                    var babelOptions = _.merge(defaultBabelOptions, {
+                    var babelOptions = merge(defaultBabelOptions, {
                         sourceMapTarget: filename,
                         sourceFileName: filename
                     });
