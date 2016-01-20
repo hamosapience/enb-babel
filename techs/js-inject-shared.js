@@ -5,6 +5,9 @@ module.exports = enb.buildFlow.create()
     .target('destTarget', '?.js')
     .defineRequiredOption('sharedTarget')
     .useSourceText('sourceTarget')
+    .needRebuild(function() {
+        return true;
+    })
     .builder(function (pageIncludeList) {
         var sharedTargetName = this.node.unmaskTargetName(this._options.sharedTarget);
 

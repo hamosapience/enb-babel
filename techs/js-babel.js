@@ -76,7 +76,7 @@ module.exports = require('enb/lib/build-flow').create()
     .builder(function (includeList) {
 
         var node = this.node;
-        var cache = this.node.getNodeCache(this._sourceTarget);
+        var cache = this.node.getNodeCache(this._target);
         var dirPath = this.node.getDir();
         var mapFileName = (this._target + '.map');
         var mapFilePath = path.join(dirPath, mapFileName);
