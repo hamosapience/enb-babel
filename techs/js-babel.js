@@ -69,6 +69,7 @@ module.exports = require('enb/lib/build-flow').create()
     .defineOption('destTarget')
     .defineOption('minify')
     .defineOption('plugins')
+    .defineOption('polyfillPath')
     .useSourceText('sourceTarget')
     .needRebuild(function() {
         return true;
@@ -101,6 +102,10 @@ module.exports = require('enb/lib/build-flow').create()
             .map(function(includeData) {
                 return includeData[1];
             });
+
+        if (this._options.polyfillPath) {
+            filenames.unshift(this._options.polyfillPath);
+        }
 
         var transformResults = Vow.all(filenames.map(function(filename) {
 

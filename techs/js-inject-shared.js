@@ -1,6 +1,4 @@
-var enb = require('enb/lib/api');
-
-module.exports = enb.buildFlow.create()
+module.exports = require('enb/lib/build-flow').create()
     .name('js-inject-shared')
     .target('destTarget', '?.js')
     .defineRequiredOption('sharedTarget')
