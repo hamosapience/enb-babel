@@ -1,3 +1,27 @@
+/**
+ * js-babel
+ * ===========
+ *
+ * Убер-технология для сборки и транспиляции JS-бандла по списку инклудов
+ * Раскрывает инклуды (не рекурсивно), транспилирует, вклеивает полифиллы, генерирует source maps,
+ * при желании – мнинифицирует код
+ *
+ * **Опции**
+ *
+ * * *String* **destTarget** — Результирующий таргет
+ * * *String* **sourceTarget** — Таргет списка инклудов
+ * * *Boolean* **minify** — Надо ли минифицировать файл
+ * * *Array<String|CommonJS>* **plugins** – Массив модулей babel-плагинов, которые будут использоваться при транспиляции
+ * * *String* **polyfillPath** – Путь к файлу с полифиллами, который будет добавлен в начала списка инклудов
+ *
+ * **Пример**
+ *
+ * ```javascript
+ *  nodeConfig.addTech(require('enb-babel-zen/techs/js-includes-include'), {
+        includeSuffix: 'include.js'
+    });
+ */
+
 var path = require('path');
 var babel = require('babel-core');
 var merge = require('lodash.merge');
