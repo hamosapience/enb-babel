@@ -1,35 +1,10 @@
-/**
- * js-babel
- * ===========
- *
- * Убер-технология для сборки и транспиляции JS-бандла по списку инклудов
- * Раскрывает инклуды (не рекурсивно), транспилирует, вклеивает полифиллы, генерирует source maps,
- * при желании – мнинифицирует код
- *
- * **Опции**
- *
- * * *String* **destTarget** — Результирующий таргет
- * * *String* **sourceTarget** — Таргет списка инклудов
- * * *Boolean* **minify** — Надо ли минифицировать файл
- * * *Array<String|CommonJS>* **plugins** – Массив модулей babel-плагинов, которые будут использоваться при транспиляции
- * * *String* **polyfillPath** – Путь к файлу с полифиллами, который будет добавлен в начала списка инклудов
- *
- * **Пример**
- *
- * ```javascript
- *  nodeConfig.addTech(require('enb-babel-zen/techs/js-includes-include'), {
-        includeSuffix: 'include.js'
-    });
- */
-
 var path = require('path');
 var babel = require('babel-core');
 var merge = require('lodash.merge');
 var uglifyJS = require("uglify-js-harmony").minify;
 var Vow = require('vow');
 var vowFs = require('vow-fs');
-var convert = require('convert-source-map');
-var combine = require('combine-source-map');
+var concat = require("source-map-concat");
 
 var sourceMappingURLTemplate = '\n //# sourceMappingURL=%filename \n';
 var includeRe = /include\("(.+)"\)/;
@@ -51,38 +26,6 @@ function getCacheMtimeKey(filename/*: string */)/*: string */ {
 
 function getCacheResultKey(filename/*: string */)/*: string */ {
     return (filename + '-result');
-}
-
-function createBundleSourceMap(transformedContent/*: Array<BabelTransformResult> */, mapFileName/*: string */, targetFileName/*: string */)/*: Object<SourceMap> */ {
-
-    var bundleSourceMap = combine.create(mapFileName);
-    var lines = 0;
-
-    transformedContent.forEach(function(content) {
-
-        var stringifiedMap = convert.fromObject(content.map).toComment();
-        var source = content.map.sourcesContent[0];
-        var lineCount = content.code.split(/\r\n|\r|\n/).length;
-
-        bundleSourceMap.addFile({
-            source: (source + '\n' + stringifiedMap),
-            sourceFile: content.map.file
-        }, {
-            line: lines
-        });
-
-        lines += lineCount;
-
-    });
-
-    var bundleSourceMapBase64 = bundleSourceMap.base64();
-    var bundleSourceMapObject = convert.fromBase64(bundleSourceMapBase64).toObject();
-
-    // bundleSourceMapObject.sources = [target];
-    bundleSourceMapObject.file = targetFileName;
-
-    return bundleSourceMapObject;
-
 }
 
 module.exports = require('enb/lib/build-flow').create()
@@ -163,13 +106,14 @@ module.exports = require('enb/lib/build-flow').create()
 
         var result = transformResults.then(function(transformedContent) {
 
-            var bundleSourceMap = createBundleSourceMap(transformedContent, mapFileName, target);
-            var bundleCode = transformedContent
-                .map(function(content) {
-                    return content.code;
-                })
-                .join('\n');
-            var result;
+            var concatenated = concat(transformedContent);
+
+            var r = concatenated.toStringWithSourceMap({
+                file: path.basename(target)
+            });
+
+            var bundleCode = r.code;
+            var bundleSourceMap = r.map;
 
             if (shouldMinify) {
                 result = minify(bundleCode, bundleSourceMap, mapFileName);
@@ -181,6 +125,7 @@ module.exports = require('enb/lib/build-flow').create()
             }
 
             return vowFs.write(mapFilePath, result.map).then(function() {
+
                 return result.code;
             });
 

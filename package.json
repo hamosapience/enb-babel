@@ -1,6 +1,6 @@
 {
   "name": "enb-babel-zen",
-  "version": "0.8.8",
+  "version": "0.9.0",
   "description": "enb babel tech",
   "keywords": [
     "enb",
@@ -42,9 +42,8 @@
     "babel-plugin-transform-es2015-unicode-regex": "^6.3.13",
     "babel-plugin-transform-flow-strip-types": "^6.3.15",
     "babel-plugin-transform-strict-mode": "^6.3.13",
-    "combine-source-map": "^0.7.1",
-    "convert-source-map": "^1.1.3",
     "lodash.merge": "^4.0.1",
+    "source-map-concat": "^1.0.0",
     "uglify-js-harmony": "^2.6.1",
     "vow": "^0.4.9",
     "vow-fs": "^0.3.4"
