@@ -113,7 +113,7 @@ module.exports = require('enb/lib/build-flow').create()
             });
 
             var bundleCode = r.code;
-            var bundleSourceMap = r.map;
+            var bundleSourceMap = JSON.parse(r.map.toString());
 
             if (shouldMinify) {
                 result = minify(bundleCode, bundleSourceMap, mapFileName);
