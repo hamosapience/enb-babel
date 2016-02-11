@@ -1,6 +1,6 @@
 {
   "name": "enb-babel-zen",
-  "version": "0.9.2",
+  "version": "0.9.4",
   "description": "enb babel tech",
   "keywords": [
     "enb",
@@ -44,7 +44,7 @@
     "babel-plugin-transform-strict-mode": "^6.3.13",
     "lodash.merge": "^4.0.1",
     "source-map-concat": "^1.0.0",
-    "uglify-js-harmony": "^2.6.1",
+    "uglify-js-harmony": "^2.6.2",
     "vow": "^0.4.9",
     "vow-fs": "^0.3.4"
   },
